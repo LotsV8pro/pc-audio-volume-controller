@@ -1,0 +1,54 @@
+{
+  "sources": [
+    {
+      "id": "music",
+      "name": "Music Player",
+      "default": 50,
+      "keyIncrease": "F13",
+      "keyDecrease": "F14",
+      "description": "Control volume for music applications like Spotify, iTunes, etc."
+    },
+    {
+      "id": "browser",
+      "name": "Browser",
+      "default": 50,
+      "keyIncrease": "F15",
+      "keyDecrease": "F16",
+      "description": "Control volume for web browsers (Chrome, Firefox, Edge, etc.)"
+    },
+    {
+      "id": "system",
+      "name": "System Sounds",
+      "default": 50,
+      "keyIncrease": "F17",
+      "keyDecrease": "F18",
+      "description": "Control volume for system notifications and sounds"
+    },
+    {
+      "id": "game",
+      "name": "Games",
+      "default": 50,
+      "keyIncrease": "F19",
+      "keyDecrease": "F20",
+      "description": "Control volume for gaming applications"
+    }
+  ],
+  "globalShortcuts": [
+    {
+      "key": "F21",
+      "action": "toggleMuteAll",
+      "description": "Mute/Unmute all audio sources"
+    },
+    {
+      "key": "F22",
+      "action": "resetAllVolumes",
+      "description": "Reset all volumes to 50%"
+    }
+  ],
+  "settings": {
+    "defaultVolume": 50,
+    "volumeStep": 5,
+    "enableNotifications": true,
+    "autoSave": true
+  }
+}
