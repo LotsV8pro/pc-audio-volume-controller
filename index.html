@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PC Audio Controller</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>PC Audio Controller</h1>
+            <p>Control different audio sources with keyboard shortcuts or sliders</p>
+        </header>
+
+        <main class="main-content">
+            <div class="controls-section">
+                <div class="section-header">
+                    <h2>Audio Sources</h2>
+                    <div class="global-controls">
+                        <button id="mute-all-btn" class="control-btn mute-btn">
+                            <span class="btn-text">Mute All</span>
+                        </button>
+                        <button id="reset-all-btn" class="control-btn reset-btn">
+                            <span class="btn-text">Reset All</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="audio-sources-container" class="audio-sources">
+                    <!-- Audio source controls will be dynamically generated here -->
+                </div>
+            </div>
+
+            <div class="shortcuts-section">
+                <h3>Keyboard Shortcuts</h3>
+                <div class="shortcuts-grid">
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F13 / F14</span>
+                        <span class="shortcut-desc">Music Player Volume</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F15 / F16</span>
+                        <span class="shortcut-desc">Browser Volume</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F17 / F18</span>
+                        <span class="shortcut-desc">System Sounds</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F19 / F20</span>
+                        <span class="shortcut-desc">Games Volume</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F21</span>
+                        <span class="shortcut-desc">Mute/Unmute All</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F22</span>
+                        <span class="shortcut-desc">Reset All Volumes</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="status-bar" class="status-bar">
+            <span id="status-text"></span>
+        </div>
+    </div>
+
+    <!-- Audio Source Template -->
+    <template id="audio-source-template">
+        <div class="audio-source-card">
+            <div class="source-header">
+                <h3 class="source-name"></h3>
+                <div class="source-controls">
+                    <button class="mute-btn-individual" data-source="">
+                        <span class="mute-text">Mute</span>
+                    </button>
+                    <span class="volume-display">50%</span>
+                </div>
+            </div>
+            <div class="slider-container">
+                <input type="range" class="volume-slider" min="0" max="100" step="1" value="50">
+                <div class="slider-track-fill"></div>
+            </div>
+            <div class="volume-labels">
+                <span class="volume-min">0%</span>
+                <span class="volume-max">100%</span>
+            </div>
+            <div class="shortcut-info">
+                <span class="shortcut-label">Shortcuts:</span>
+                <span class="shortcut-keys-info"></span>
+            </div>
+        </div>
+    </template>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
