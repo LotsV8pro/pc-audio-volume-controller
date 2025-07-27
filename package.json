@@ -1,0 +1,19 @@
+{
+  "name": "pc-audio-vol-controller",
+  "version": "1.0.0",
+  "description": "An app to control different audio source volumes via keyboard input and GUI sliders",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron . --no-sandbox",
+    "dev": "electron . --dev --no-sandbox"
+  },
+  "dependencies": {
+    "electron": "^27.0.0",
+    "loudness": "^0.4.2"
+  },
+  "devDependencies": {
+    "electron-reload": "^1.5.0"
+  },
+  "author": "Audio Controller",
+  "license": "MIT"
+}
