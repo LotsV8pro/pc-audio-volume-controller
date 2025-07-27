@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PC Audio Controller - Web Demo</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Reset and base styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header styles */
+        .app-header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: white;
+        }
+
+        .app-header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .app-header p {
+            font-size: 1.2rem;
+            font-weight: 300;
+            opacity: 0.9;
+        }
+
+        .demo-notice {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: white;
+            text-align: center;
+        }
+
+        /* Main content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .controls-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .section-header h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .global-controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mute-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+            color: white;
+        }
+
+        .mute-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+
+        .reset-btn {
+            background: linear-gradient(135deg, #4ecdc4, #44a08d);
+            color: white;
+        }
+
+        .reset-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
+        }
+
+        /* Audio sources grid */
+        .audio-sources {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .audio-source-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .audio-source-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+
+        .source-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .source-name {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .source-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .mute-btn-individual {
+            padding: 6px 12px;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #4a5568;
+        }
+
+        .mute-btn-individual:hover {
+            background: #edf2f7;
+            border-color: #cbd5e0;
+        }
+
+        .mute-btn-individual.muted {
+            background: #fed7d7;
+            border-color: #feb2b2;
+            color: #c53030;
+        }
+
+        .volume-display {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #4a5568;
+            min-width: 45px;
+            text-align: right;
+        }
+
+        /* Slider styles */
+        .slider-container {
+            position: relative;
+            margin: 20px 0;
+        }
+
+        .volume-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #e2e8f0;
+            outline: none;
+            appearance: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+            transition: all 0.2s ease;
+        }
+
+        .volume-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
+        }
+
+        .volume-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+        }
+
+        .volume-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: #718096;
+            margin-top: 8px;
+        }
+
+        .shortcut-info {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 0.85rem;
+            color: #718096;
+        }
+
+        .shortcut-label {
+            font-weight: 500;
+        }
+
+        .shortcut-keys-info {
+            background: #f7fafc;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            margin-left: 8px;
+        }
+
+        /* Shortcuts section */
+        .shortcuts-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .shortcuts-section h3 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 20px;
+        }
+
+        .shortcuts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .shortcut-keys {
+            font-family: 'Courier New', monospace;
+            background: #f7fafc;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .shortcut-desc {
+            font-size: 0.9rem;
+            color: #718096;
+        }
+
+        /* Status bar */
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 12px 20px;
+            text-align: center;
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .status-bar.show {
+            transform: translateY(0);
+        }
+
+        .status-bar.error {
+            background: rgba(220, 38, 38, 0.9);
+        }
+
+        .status-bar.success {
+            background: rgba(34, 197, 94, 0.9);
+        }
+
+        /* Animation classes */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .pulse {
+            animation: pulse 0.3s ease-in-out;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .app-container {
+                padding: 15px;
+            }
+            
+            .app-header h1 {
+                font-size: 2.2rem;
+            }
+            
+            .audio-sources {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>PC Audio Controller</h1>
+            <p>Control different audio sources with keyboard shortcuts or sliders</p>
+            <div class="demo-notice">
+                <strong>Demo Version:</strong> This is a web-based demonstration. The full Electron app would provide actual system audio control.
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="controls-section">
+                <div class="section-header">
+                    <h2>Audio Sources</h2>
+                    <div class="global-controls">
+                        <button id="mute-all-btn" class="control-btn mute-btn">
+                            <span class="btn-text">Mute All</span>
+                        </button>
+                        <button id="reset-all-btn" class="control-btn reset-btn">
+                            <span class="btn-text">Reset All</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="audio-sources">
+                    <div class="audio-source-card fade-in">
+                        <div class="source-header">
+                            <h3 class="source-name">Music Player</h3>
+                            <div class="source-controls">
+                                <button class="mute-btn-individual" data-source="music">
+                                    <span class="mute-text">Mute</span>
+                                </button>
+                                <span class="volume-display" id="music-display">50%</span>
+                            </div>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" class="volume-slider" id="music-slider" min="0" max="100" step="1" value="50">
+                        </div>
+                        <div class="volume-labels">
+                            <span class="volume-min">0%</span>
+                            <span class="volume-max">100%</span>
+                        </div>
+                        <div class="shortcut-info">
+                            <span class="shortcut-label">Shortcuts:</span>
+                            <span class="shortcut-keys-info">F13 / F14</span>
+                        </div>
+                    </div>
+
+                    <div class="audio-source-card fade-in">
+                        <div class="source-header">
+                            <h3 class="source-name">Browser</h3>
+                            <div class="source-controls">
+                                <button class="mute-btn-individual" data-source="browser">
+                                    <span class="mute-text">Mute</span>
+                                </button>
+                                <span class="volume-display" id="browser-display">50%</span>
+                            </div>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" class="volume-slider" id="browser-slider" min="0" max="100" step="1" value="50">
+                        </div>
+                        <div class="volume-labels">
+                            <span class="volume-min">0%</span>
+                            <span class="volume-max">100%</span>
+                        </div>
+                        <div class="shortcut-info">
+                            <span class="shortcut-label">Shortcuts:</span>
+                            <span class="shortcut-keys-info">F15 / F16</span>
+                        </div>
+                    </div>
+
+                    <div class="audio-source-card fade-in">
+                        <div class="source-header">
+                            <h3 class="source-name">System Sounds</h3>
+                            <div class="source-controls">
+                                <button class="mute-btn-individual" data-source="system">
+                                    <span class="mute-text">Mute</span>
+                                </button>
+                                <span class="volume-display" id="system-display">50%</span>
+                            </div>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" class="volume-slider" id="system-slider" min="0" max="100" step="1" value="50">
+                        </div>
+                        <div class="volume-labels">
+                            <span class="volume-min">0%</span>
+                            <span class="volume-max">100%</span>
+                        </div>
+                        <div class="shortcut-info">
+                            <span class="shortcut-label">Shortcuts:</span>
+                            <span class="shortcut-keys-info">F17 / F18</span>
+                        </div>
+                    </div>
+
+                    <div class="audio-source-card fade-in">
+                        <div class="source-header">
+                            <h3 class="source-name">Games</h3>
+                            <div class="source-controls">
+                                <button class="mute-btn-individual" data-source="game">
+                                    <span class="mute-text">Mute</span>
+                                </button>
+                                <span class="volume-display" id="game-display">50%</span>
+                            </div>
+                        </div>
+                        <div class="slider-container">
+                            <input type="range" class="volume-slider" id="game-slider" min="0" max="100" step="1" value="50">
+                        </div>
+                        <div class="volume-labels">
+                            <span class="volume-min">0%</span>
+                            <span class="volume-max">100%</span>
+                        </div>
+                        <div class="shortcut-info">
+                            <span class="shortcut-label">Shortcuts:</span>
+                            <span class="shortcut-keys-info">F19 / F20</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="shortcuts-section">
+                <h3>Keyboard Shortcuts</h3>
+                <div class="shortcuts-grid">
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F13 / F14</span>
+                        <span class="shortcut-desc">Music Player Volume</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F15 / F16</span>
+                        <span class="shortcut-desc">Browser Volume</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F17 / F18</span>
+                        <span class="shortcut-desc">System Sounds</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F19 / F20</span>
+                        <span class="shortcut-desc">Games Volume</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F21</span>
+                        <span class="shortcut-desc">Mute/Unmute All</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-keys">F22</span>
+                        <span class="shortcut-desc">Reset All Volumes</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="status-bar" class="status-bar">
+            <span id="status-text"></span>
+        </div>
+    </div>
+
+    <script>
+        // Audio sources data
+        const audioSources = {
+            music: { name: 'Music Player', volume: 50, muted: false },
+            browser: { name: 'Browser', volume: 50, muted: false },
+            system: { name: 'System Sounds', volume: 50, muted: false },
+            game: { name: 'Games', volume: 50, muted: false }
+        };
+
+        let globalMuted = false;
+
+        // Initialize the app
+        document.addEventListener('DOMContentLoaded', () => {
+            setupEventListeners();
+            showStatus('PC Audio Controller Demo loaded successfully!', 'success');
+        });
+
+        function setupEventListeners() {
+            // Global control buttons
+            document.getElementById('mute-all-btn').addEventListener('click', toggleMuteAll);
+            document.getElementById('reset-all-btn').addEventListener('click', resetAllVolumes);
+
+            // Individual sliders and mute buttons
+            Object.keys(audioSources).forEach(sourceId => {
+                const slider = document.getElementById(`${sourceId}-slider`);
+                const muteBtn = document.querySelector(`[data-source="${sourceId}"]`);
+
+                if (slider) {
+                    slider.addEventListener('input', (e) => handleSliderChange(sourceId, e.target.value));
+                }
+
+                if (muteBtn) {
+                    muteBtn.addEventListener('click', () => toggleMute(sourceId));
+                }
+            });
+
+            // Keyboard shortcuts simulation
+            document.addEventListener('keydown', handleKeyboardShortcut);
+        }
+
+        function handleSliderChange(sourceId, value) {
+            const volume = parseInt(value);
+            audioSources[sourceId].volume = volume;
+            
+            const display = document.getElementById(`${sourceId}-display`);
+            if (display) {
+                display.textContent = `${volume}%`;
+            }
+
+            updateSliderBackground(sourceId, volume);
+            showStatus(`${audioSources[sourceId].name} volume: ${volume}%`, 'success');
+        }
+
+        function updateSliderBackground(sourceId, value) {
+            const slider = document.getElementById(`${sourceId}-slider`);
+            if (slider) {
+                const percentage = (value / 100) * 100;
+                slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
+            }
+        }
+
+        function toggleMute(sourceId) {
+            audioSources[sourceId].muted = !audioSources[sourceId].muted;
+            const muteBtn = document.querySelector(`[data-source="${sourceId}"]`);
+            const muteText = muteBtn.querySelector('.mute-text');
+            
+            if (audioSources[sourceId].muted) {
+                muteBtn.classList.add('muted');
+                muteText.textContent = 'Unmute';
+                showStatus(`${audioSources[sourceId].name} muted`, 'success');
+            } else {
+                muteBtn.classList.remove('muted');
+                muteText.textContent = 'Mute';
+                showStatus(`${audioSources[sourceId].name} unmuted`, 'success');
+            }
+        }
+
+        function toggleMuteAll() {
+            globalMuted = !globalMuted;
+            const muteAllBtn = document.getElementById('mute-all-btn');
+            const btnText = muteAllBtn.querySelector('.btn-text');
+            
+            btnText.textContent = globalMuted ? 'Unmute All' : 'Mute All';
+            showStatus(`All audio ${globalMuted ? 'muted' : 'unmuted'}`, 'success');
+        }
+
+        function resetAllVolumes() {
+            Object.keys(audioSources).forEach(sourceId => {
+                audioSources[sourceId].volume = 50;
+                audioSources[sourceId].muted = false;
+                
+                const slider = document.getElementById(`${sourceId}-slider`);
+                const display = document.getElementById(`${sourceId}-display`);
+                const muteBtn = document.querySelector(`[data-source="${sourceId}"]`);
+                
+                if (slider) slider.value = 50;
+                if (display) display.textContent = '50%';
+                if (muteBtn) {
+                    muteBtn.classList.remove('muted');
+                    muteBtn.querySelector('.mute-text').textContent = 'Mute';
+                }
+                
+                updateSliderBackground(sourceId, 50);
+            });
+            
+            showStatus('All volumes reset to 50%', 'success');
+        }
+
+        function handleKeyboardShortcut(e) {
+            const keyMap = {
+                'F13': () => adjustVolume('music', -5),
+                'F14': () => adjustVolume('music', 5),
+                'F15': () => adjustVolume('browser', -5),
+                'F16': () => adjustVolume('browser', 5),
+                'F17': () => adjustVolume('system', -5),
+                'F18': () => adjustVolume('system', 5),
+                'F19': () => adjustVolume('game', -5),
+                'F20': () => adjustVolume('game', 5),
+                'F21': toggleMuteAll,
+                'F22': resetAllVolumes
+            };
+
+            if (keyMap[e.code]) {
+                e.preventDefault();
+                keyMap[e.code]();
+                highlightShortcut(e.code);
+            }
+        }
+
+        function adjustVolume(sourceId, change) {
+            const currentVolume = audioSources[sourceId].volume;
+            const newVolume = Math.max(0, Math.min(100, currentVolume + change));
+            
+            audioSources[sourceId].volume = newVolume;
+            
+            const slider = document.getElementById(`${sourceId}-slider`);
+            const display = document.getElementById(`${sourceId}-display`);
+            
+            if (slider) slider.value = newVolume;
+            if (display) display.textContent = `${newVolume}%`;
+            
+            updateSliderBackground(sourceId, newVolume);
+            showStatus(`${audioSources[sourceId].name} volume: ${newVolume}%`, 'success');
+            
+            // Highlight the source card
+            const card = slider?.closest('.audio-source-card');
+            if (card) {
+                card.classList.add('pulse');
+                setTimeout(() => card.classList.remove('pulse'), 300);
+            }
+        }
+
+        function highlightShortcut(keyCode) {
+            const shortcutItems = document.querySelectorAll('.shortcut-item');
+            shortcutItems.forEach(item => {
+                const keys = item.querySelector('.shortcut-keys').textContent;
+                if (keys.includes(keyCode.replace('F', ''))) {
+                    item.classList.add('pulse');
+                    setTimeout(() => item.classList.remove('pulse'), 300);
+                }
+            });
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusBar = document.getElementById('status-bar');
+            const statusText = document.getElementById('status-text');
+            
+            statusText.textContent = message;
+            statusBar.className = `status-bar show ${type}`;
+            
+            setTimeout(() => {
+                statusBar.classList.remove('show');
+            }, 3000);
+        }
+
+        // Initialize slider backgrounds
+        Object.keys(audioSources).forEach(sourceId => {
+            updateSliderBackground(sourceId, 50);
+        });
+
+        console.log('PC Audio Controller Demo initialized');
+    </script>
+</body>
+</html>
