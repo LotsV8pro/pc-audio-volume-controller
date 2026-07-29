@@ -57,8 +57,9 @@ impl LotusAudioApp {
                     .collect();
 
                 let current_ids: HashSet<String> = current.iter().map(|(id, _)| id.clone()).collect();
-                let new_sinks: HashSet<String> = current_ids.difference(&self.enabled_sinks).cloned().collect();
-                self.enabled_sinks.extend(new_sinks);
+                let prev_ids: HashSet<String> = self.all_sink_ids_snapshot.iter().map(|(id, _)| id.clone()).collect();
+                let truly_new: HashSet<String> = current_ids.difference(&prev_ids).cloned().collect();
+                self.enabled_sinks.extend(truly_new);
                 self.enabled_sinks.retain(|id| current_ids.contains(id));
 
                 if self.all_sink_ids_snapshot != current {
@@ -275,7 +276,7 @@ impl LotusAudioApp {
                                 };
 
                                 let col_height = ui.available_height().max(300.0);
-                                ui.allocate_space(Vec2::new(col_width, col_height));
+                                let (_id, col_rect) = ui.allocate_space(Vec2::new(col_width, col_height));
 
                                 frame.show(ui, |ui| {
                                     ui.set_width(col_width - 20.0);
@@ -342,7 +343,7 @@ impl LotusAudioApp {
                                         }
 
                                         if let Some(pos) = pointer_pos {
-                                            if ui.min_rect().contains(pos) && self.dragging_source.is_some() {
+                                            if col_rect.contains(pos) && self.dragging_source.is_some() {
                                                 new_hover = Some(sink_id.clone());
                                             }
                                         }
