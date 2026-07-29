@@ -63,9 +63,7 @@ impl AudioGraph {
             .nodes
             .values()
             .filter(|n| {
-                n.media_class == "Audio/Sink"
-                    || n.media_class == "Audio/Sink/Internal"
-                    || n.media_class == "Stream/Input/Audio"
+                n.media_class == "Audio/Sink" || n.media_class == "Audio/Sink/Internal"
             })
             .collect();
         v.sort_by(|a, b| a.name.cmp(&b.name));
