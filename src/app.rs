@@ -56,11 +56,10 @@ impl LotusAudioApp {
                     }))
                     .collect();
 
-                for (id, _) in &current {
-                    if !self.enabled_sinks.contains(id) {
-                        self.enabled_sinks.insert(id.clone());
-                    }
-                }
+                let current_ids: HashSet<String> = current.iter().map(|(id, _)| id.clone()).collect();
+                let new_sinks: HashSet<String> = current_ids.difference(&self.enabled_sinks).cloned().collect();
+                self.enabled_sinks.extend(new_sinks);
+                self.enabled_sinks.retain(|id| current_ids.contains(id));
 
                 if self.all_sink_ids_snapshot != current {
                     self.all_sink_ids_snapshot = current;
