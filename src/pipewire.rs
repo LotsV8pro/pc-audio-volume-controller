@@ -154,10 +154,9 @@ pub fn remove_link(output: &str, input: &str) -> Result<()> {
 }
 
 pub fn set_node_volume(node_name: &str, volume: f32) -> Result<()> {
-    let vol = (volume * 100.0) as u32;
     run_cmd(
         "pw-cli",
-        &["set-param", node_name, "Props", &format!("{{ volume: {} }}", vol)],
+        &["set-param", node_name, "Props", &format!("{{ volume: {:.3} }}", volume)],
     )
     .ok();
     Ok(())
