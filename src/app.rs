@@ -1,6 +1,6 @@
-use eframe::egui::{self, Color32, CornerRadius, Frame, Margin, Pos2, Vec2, Id};
+use eframe::egui::{self, Color32, CornerRadius, Frame, Margin, Vec2};
 
-use crate::graph::{AudioGraph, AudioNode};
+use crate::graph::AudioGraph;
 use crate::pipewire;
 
 #[derive(Clone, PartialEq)]
@@ -14,14 +14,11 @@ pub struct LotusAudioApp {
     panel: Panel,
     error: Option<String>,
 
-    dragging_from_port: Option<String>,
-    drag_start_pos: Option<Pos2>,
-    hovered_port: Option<String>,
+    dragging_source: Option<String>,
+    drag_hover_zone: Option<String>,
 
     refresh_timer: f64,
     auto_refresh: bool,
-
-    node_hover: Option<String>,
 }
 
 impl Default for LotusAudioApp {
@@ -30,12 +27,10 @@ impl Default for LotusAudioApp {
             graph: AudioGraph::new(),
             panel: Panel::Graph,
             error: None,
-            dragging_from_port: None,
-            drag_start_pos: None,
-            hovered_port: None,
+            dragging_source: None,
+            drag_hover_zone: None,
             refresh_timer: 0.0,
             auto_refresh: true,
-            node_hover: None,
         };
         app.refresh();
         app
@@ -59,18 +54,15 @@ impl LotusAudioApp {
         }
     }
 
-    fn try_create_link(&mut self, output: &str, input: &str) {
-        if let Err(e) = pipewire::create_link(output, input) {
-            self.error = Some(format!("Link failed: {}", e));
+    fn try_relink_source(&mut self, source_id: &str, target_sink_id: &str) {
+        let source_name = self.graph.nodes.get(source_id).map(|n| n.name.clone());
+        let sink_name = self.graph.nodes.get(target_sink_id).map(|n| n.name.clone());
+        if let (Some(sn), Some(tn)) = (source_name, sink_name) {
+            if let Err(e) = pipewire::relink_source(&sn, &tn) {
+                self.error = Some(format!("Relink failed: {}", e));
+            }
+            self.refresh();
         }
-        self.refresh();
-    }
-
-    fn try_remove_link(&mut self, output: &str, input: &str) {
-        if let Err(e) = pipewire::remove_link(output, input) {
-            self.error = Some(format!("Unlink failed: {}", e));
-        }
-        self.refresh();
     }
 }
 
@@ -99,25 +91,22 @@ impl eframe::App for LotusAudioApp {
         style.visuals.selection.bg_fill = Color32::from_rgba_premultiplied(0xC4, 0xA8, 0xE2, 40);
         ctx.set_style(style);
 
-        let pointer_pos = ctx.input(|i| i.pointer.hover_pos());
         let pointer_released = ctx.input(|i| i.pointer.any_released());
 
         if pointer_released {
-            let drag_port = self.dragging_from_port.clone();
-            let drop_port = self.hovered_port.clone();
-            if let (Some(ref dp), Some(ref hp)) = (drag_port, drop_port) {
-                if dp != hp {
-                    self.try_create_link(dp, hp);
+            if let (Some(src), Some(zone)) = (self.dragging_source.clone(), self.drag_hover_zone.clone()) {
+                if src != zone {
+                    self.try_relink_source(&src, &zone);
                 }
             }
-            self.dragging_from_port = None;
-            self.drag_start_pos = None;
+            self.dragging_source = None;
+            self.drag_hover_zone = None;
         }
 
         let dt = ctx.input(|i| i.unstable_dt) as f64;
         self.refresh_timer += dt;
 
-        if self.auto_refresh && self.refresh_timer >= 2.0 && self.dragging_from_port.is_none() {
+        if self.auto_refresh && self.refresh_timer >= 2.0 && self.dragging_source.is_none() {
             self.refresh();
             self.refresh_timer = 0.0;
         }
@@ -147,26 +136,8 @@ impl eframe::App for LotusAudioApp {
         }
 
         match self.panel {
-            Panel::Graph => self.show_graph(ctx, a, a_dim, card, card_light, txt, dim, pointer_pos),
+            Panel::Graph => self.show_graph(ctx, a, a_dim, bg, card, card_light, txt, dim),
             Panel::Volumes => self.show_volumes(ctx, a, card, card_light, txt, dim),
-        }
-
-        if let Some(ref drag_port) = self.dragging_from_port.clone() {
-            if let Some(pos) = pointer_pos {
-                let painter = ctx.layer_painter(egui::LayerId::new(egui::Order::Foreground, Id::new("drag_line")));
-                if let Some(start) = self.drag_start_pos {
-                    let line_color = if self.hovered_port.is_some() { a } else { a_dim };
-                    painter.line_segment([start, pos], (2.0, line_color));
-                    painter.circle_filled(pos, 4.0, a);
-                    painter.text(
-                        pos + Vec2::new(12.0, -8.0),
-                        egui::Align2::LEFT_CENTER,
-                        &drag_port.split(':').last().unwrap_or(drag_port),
-                        egui::FontId::proportional(10.0),
-                        dim,
-                    );
-                }
-            }
         }
 
         ctx.request_repaint();
@@ -176,164 +147,114 @@ impl eframe::App for LotusAudioApp {
 impl LotusAudioApp {
     fn show_graph(
         &mut self, ctx: &egui::Context,
-        a: Color32, a_dim: Color32, card: Color32, card_light: Color32,
-        txt: Color32, dim: Color32, pointer_pos: Option<Pos2>,
+        a: Color32, a_dim: Color32, bg: Color32, card: Color32, card_light: Color32,
+        txt: Color32, dim: Color32,
     ) {
-        let mut new_hover: Option<String> = None;
-
-        let source_ids: Vec<String> = self.graph.sources().iter().map(|n| n.id.clone()).collect();
         let sink_ids: Vec<String> = self.graph.sinks().iter().map(|n| n.id.clone()).collect();
 
-        let sources_data: Vec<(AudioNode, Vec<crate::graph::AudioPort>, usize)> = source_ids.iter()
-            .filter_map(|id| {
-                self.graph.nodes.get(id).map(|n| {
-                    let ports: Vec<crate::graph::AudioPort> = self.graph.output_ports(id).into_iter().cloned().collect();
-                    let lc = self.graph.links.iter()
-                        .filter(|l| ports.iter().any(|p| p.id == l.output_port || p.id == l.input_port))
-                        .count();
-                    (n.clone(), ports, lc)
-                })
+        let zone_data: Vec<(String, String, Vec<(String, String)>)> = sink_ids.iter()
+            .filter_map(|id| self.graph.nodes.get(id))
+            .map(|sink| {
+                let sources = self.graph.sources_for_sink(&sink.id);
+                let pills: Vec<(String, String)> = sources.iter()
+                    .map(|s| (s.id.clone(), s.name.clone()))
+                    .collect();
+                (sink.id.clone(), sink.name.clone(), pills)
             })
             .collect();
-
-        let sinks_data: Vec<(AudioNode, Vec<crate::graph::AudioPort>, usize)> = sink_ids.iter()
-            .filter_map(|id| {
-                self.graph.nodes.get(id).map(|n| {
-                    let ports: Vec<crate::graph::AudioPort> = self.graph.input_ports(id).into_iter().cloned().collect();
-                    let lc = self.graph.links.iter()
-                        .filter(|l| ports.iter().any(|p| p.id == l.output_port || p.id == l.input_port))
-                        .count();
-                    (n.clone(), ports, lc)
-                })
-            })
-            .collect();
-
-        let links = self.graph.links.clone();
-
-        egui::SidePanel::left("sources_panel")
-            .resizable(true).default_width(280.0).min_width(200.0)
-            .frame(Frame { fill: card, inner_margin: Margin::symmetric(8, 8), ..Default::default() })
-            .show(ctx, |ui| {
-                ui.label(egui::RichText::new("◈ SOURCES").color(a).size(14.0));
-                ui.separator();
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for (node, ports, lc) in &sources_data {
-                        self.render_node(ui, node, true, &ports, *lc, a, a_dim, card_light, txt, dim, &mut new_hover, pointer_pos);
-                    }
-                });
-            });
-
-        egui::SidePanel::right("sinks_panel")
-            .resizable(true).default_width(280.0).min_width(200.0)
-            .frame(Frame { fill: card, inner_margin: Margin::symmetric(8, 8), ..Default::default() })
-            .show(ctx, |ui| {
-                ui.label(egui::RichText::new("◈ SINKS").color(a).size(14.0));
-                ui.separator();
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for (node, ports, lc) in &sinks_data {
-                        self.render_node(ui, node, false, &ports, *lc, a, a_dim, card_light, txt, dim, &mut new_hover, pointer_pos);
-                    }
-                });
-            });
 
         egui::CentralPanel::default()
-            .frame(Frame { fill: Color32::from_rgb(0x10, 0x0E, 0x14), inner_margin: Margin::symmetric(12, 8), ..Default::default() })
+            .frame(Frame { fill: bg, inner_margin: Margin::symmetric(12, 8), ..Default::default() })
             .show(ctx, |ui| {
-                ui.label(egui::RichText::new("◈ CONNECTIONS").color(a).size(14.0));
+                ui.label(egui::RichText::new("◈ AUDIO ZONES").color(a).size(14.0));
                 ui.separator();
                 ui.add_space(4.0);
 
-                let hint = if self.dragging_from_port.is_some() {
-                    "Drop on a sink port to connect"
-                } else {
-                    "Drag ⬤ from a source port to a sink port"
-                };
-                ui.label(egui::RichText::new(hint).color(dim).size(11.0));
-                ui.add_space(8.0);
+                if let Some(ref drag_src) = self.dragging_source {
+                    let src_name = self.graph.nodes.get(drag_src)
+                        .map(|n| n.name.as_str()).unwrap_or(drag_src);
+                    ui.label(egui::RichText::new(format!("Dragging: {}", src_name)).color(a).size(12.0));
+                    ui.add_space(4.0);
+                }
+
+                let pointer_pos = ctx.input(|i| i.pointer.hover_pos());
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
-                    for link in &links {
-                        let out_s = link.output_port.split(':').last().unwrap_or(&link.output_port);
-                        let in_s = link.input_port.split(':').last().unwrap_or(&link.input_port);
-                        let out_p = link.output_port.clone();
-                        let in_p = link.input_port.clone();
+                    let mut new_hover: Option<String> = None;
 
-                        Frame { fill: card_light, corner_radius: CornerRadius::same(6), inner_margin: Margin::symmetric(8, 6), ..Default::default() }
-                            .show(ui, |ui| {
-                                ui.horizontal(|ui| {
-                                    ui.label(egui::RichText::new(out_s).color(a).size(11.0));
-                                    ui.label(egui::RichText::new(" → ").color(dim));
-                                    ui.label(egui::RichText::new(in_s).color(txt).size(11.0));
-                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        if ui.button("✕").clicked() { self.try_remove_link(&out_p, &in_p); }
-                                    });
-                                });
+                    for (sink_id, sink_name, pills) in &zone_data {
+                        let is_hover_zone = self.dragging_source.is_some()
+                            && self.drag_hover_zone.as_deref() == Some(sink_id);
+
+                        let zone_fill = if is_hover_zone {
+                            Color32::from_rgb(0x38, 0x20, 0x48)
+                        } else {
+                            card
+                        };
+
+                        Frame {
+                            fill: zone_fill,
+                            corner_radius: CornerRadius::same(10),
+                            stroke: egui::Stroke::new(if is_hover_zone { 1.5_f32 } else { 0.0_f32 }, a_dim),
+                            inner_margin: Margin::symmetric(12, 10),
+                            ..Default::default()
+                        }.show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(egui::RichText::new("◆").color(a).size(14.0));
+                                ui.heading(egui::RichText::new(sink_name).color(txt).size(16.0));
+                                ui.label(egui::RichText::new(format!("{} apps", pills.len())).color(dim).size(11.0));
                             });
-                        ui.add_space(3.0);
-                    }
-                    if links.is_empty() && self.dragging_from_port.is_none() {
-                        ui.label(egui::RichText::new("No connections").color(dim).size(12.0));
-                    }
-                });
-            });
+                            ui.add_space(6.0);
 
-        self.hovered_port = new_hover;
-    }
+                            if pills.is_empty() {
+                                ui.label(egui::RichText::new("No apps routed here").color(dim).size(11.0));
+                            } else {
+                                ui.horizontal_wrapped(|ui| {
+                                    for (source_id, source_name) in pills {
+                                        let pill_hover = self.dragging_source.as_deref() == Some(source_id);
+                                        let pill_fill = if pill_hover {
+                                            Color32::from_rgb(0x4C, 0x3C, 0x5C)
+                                        } else {
+                                            card_light
+                                        };
 
-    #[allow(clippy::too_many_arguments)]
-    fn render_node(
-        &mut self, ui: &mut egui::Ui, node: &AudioNode, is_source: bool,
-        ports: &[crate::graph::AudioPort], link_count: usize,
-        a: Color32, a_dim: Color32, card_light: Color32, txt: Color32, dim: Color32,
-        new_hover: &mut Option<String>, pointer_pos: Option<Pos2>,
-    ) {
-        let is_hovered = self.node_hover.as_deref() == Some(&node.id);
-        let bg = if is_hovered { Color32::from_rgb(0x38, 0x30, 0x48) } else { card_light };
+                                        let desired_size = Vec2::new(100.0, 28.0);
+                                        let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
 
-        Frame { fill: bg, corner_radius: CornerRadius::same(6), inner_margin: Margin::symmetric(8, 6), ..Default::default() }
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(&node.name).color(txt).size(12.0));
-                    if link_count > 0 {
-                        ui.label(egui::RichText::new(format!("🔗{}", link_count)).color(a).size(10.0));
-                    }
-                });
+                                        let p = ui.painter();
+                                        p.rect_filled(rect, 14.0, pill_fill);
+                                        if response.hovered() || pill_hover {
+                                            p.rect_stroke(rect, 14.0, egui::Stroke::new(1.0_f32, a_dim), egui::StrokeKind::Outside);
+                                        }
+                                        p.text(
+                                            rect.center(),
+                                            egui::Align2::CENTER_CENTER,
+                                            source_name,
+                                            egui::FontId::proportional(12.0),
+                                            txt,
+                                        );
 
-                let desc = if node.description.is_empty() { &node.name } else { &node.description };
-                ui.label(egui::RichText::new(desc).color(dim).size(10.0));
-                ui.add_space(2.0);
+                                        if response.drag_started() {
+                                            self.dragging_source = Some(source_id.clone());
+                                        }
 
-                for port in ports {
-                    let port_label = port.name.split(':').last().unwrap_or(&port.name);
-                    let is_dragging_this = self.dragging_from_port.as_deref() == Some(&port.id);
-                    let dot_color = if is_dragging_this { Color32::WHITE } else { a };
-
-                    let dot_size = 8.0;
-                    let (rect, response) = ui.allocate_exact_size(Vec2::new(dot_size + 4.0, 14.0), egui::Sense::drag());
-
-                    let dot_center = rect.center();
-                    let painter = ui.painter();
-                    painter.circle_filled(dot_center, dot_size / 2.0, dot_color);
-                    painter.circle_stroke(dot_center, dot_size / 2.0_f32, egui::Stroke::new(1.0_f32, a_dim));
-
-                    let label_pos = Pos2::new(rect.right() + 4.0, rect.center().y);
-                    painter.text(label_pos, egui::Align2::LEFT_CENTER, port_label, egui::FontId::proportional(10.0), dim);
-
-                    if response.drag_started() {
-                        self.dragging_from_port = Some(port.id.clone());
-                        self.drag_start_pos = pointer_pos;
-                    }
-
-                    if !is_source && self.dragging_from_port.is_some() {
-                        if let Some(pos) = pointer_pos {
-                            if response.rect.expand(4.0).contains(pos) {
-                                *new_hover = Some(port.id.clone());
+                                        ui.add_space(6.0);
+                                    }
+                                });
                             }
-                        }
+
+                            if let Some(pos) = pointer_pos {
+                                if ui.min_rect().contains(pos) && self.dragging_source.is_some() {
+                                    new_hover = Some(sink_id.clone());
+                                }
+                            }
+                        });
+                        ui.add_space(8.0);
                     }
-                }
+
+                    self.drag_hover_zone = new_hover;
+                });
             });
-        ui.add_space(4.0);
     }
 
     fn show_volumes(

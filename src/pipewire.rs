@@ -168,3 +168,43 @@ pub fn set_node_volume(node_name: &str, volume: f32) -> Result<()> {
     .ok();
     Ok(())
 }
+
+pub fn relink_source(source_name: &str, target_sink_name: &str) -> Result<()> {
+    let graph = fetch_graph()?;
+
+    let source_node = graph.nodes.values().find(|n| n.name == source_name)
+        .ok_or_else(|| anyhow::anyhow!("source '{}' not found", source_name))?;
+    let target_node = graph.nodes.values().find(|n| n.name == target_sink_name)
+        .ok_or_else(|| anyhow::anyhow!("sink '{}' not found", target_sink_name))?;
+
+    let output_ports: Vec<&str> = source_node.ports.iter()
+        .filter(|p| p.direction == PortDirection::Output)
+        .map(|p| p.name.as_str())
+        .collect();
+
+    let input_ports: Vec<&str> = target_node.ports.iter()
+        .filter(|p| p.direction == PortDirection::Input)
+        .map(|p| p.name.as_str())
+        .collect();
+
+    let full_output_ports: Vec<String> = source_node.ports.iter()
+        .filter(|p| p.direction == PortDirection::Output)
+        .map(|p| p.id.clone())
+        .collect();
+
+    for link in &graph.links {
+        if full_output_ports.contains(&link.output_port) {
+            let _ = run_cmd("pw-link", &["-d", &link.output_port, &link.input_port]);
+        }
+    }
+
+    for op in &output_ports {
+        if let Some(ip) = input_ports.iter().find(|ip| ip.starts_with(op)) {
+            let src_port = format!("{}:{}", source_name, op);
+            let dst_port = format!("{}:{}", target_sink_name, ip);
+            let _ = run_cmd("pw-link", &[&src_port, &dst_port]);
+        }
+    }
+
+    Ok(())
+}
