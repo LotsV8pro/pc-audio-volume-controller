@@ -163,6 +163,10 @@ pub fn set_node_volume(node_name: &str, volume: f32) -> Result<()> {
     Ok(())
 }
 
+fn channel_name(port_name: &str) -> &str {
+    port_name.rsplit_once('_').map(|(_, c)| c).unwrap_or(port_name)
+}
+
 pub fn relink_source(source_name: &str, target_sink_name: &str) -> Result<()> {
     let graph = fetch_graph()?;
 
@@ -176,7 +180,7 @@ pub fn relink_source(source_name: &str, target_sink_name: &str) -> Result<()> {
         .map(|p| p.name.as_str())
         .collect();
 
-    let input_ports: Vec<&str> = target_node.ports.iter()
+    let input_port_names: Vec<&str> = target_node.ports.iter()
         .filter(|p| p.direction == PortDirection::Input)
         .map(|p| p.name.as_str())
         .collect();
@@ -193,9 +197,10 @@ pub fn relink_source(source_name: &str, target_sink_name: &str) -> Result<()> {
     }
 
     for op in &output_ports {
-        if let Some(ip) = input_ports.iter().find(|ip| ip.starts_with(op)) {
+        let ch = channel_name(op);
+        if let Some(ip_name) = input_port_names.iter().find(|ip| channel_name(ip) == ch) {
             let src_port = format!("{}:{}", source_name, op);
-            let dst_port = format!("{}:{}", target_sink_name, ip);
+            let dst_port = format!("{}:{}", target_sink_name, ip_name);
             let _ = run_cmd("pw-link", &[&src_port, &dst_port]);
         }
     }
