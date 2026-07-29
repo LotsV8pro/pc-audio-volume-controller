@@ -18,14 +18,15 @@ fn run_cmd(program: &str, args: &[&str]) -> Result<String> {
 pub fn fetch_graph() -> Result<AudioGraph> {
     let mut graph = AudioGraph::new();
 
-    let links_output = run_cmd("pw-link", &["-l"])?;
-    let output_ports = run_cmd("pw-link", &["-o", "-v"])?;
-    let input_ports = run_cmd("pw-link", &["-i", "-v"])?;
     let pw_cli = run_cmd("pw-cli", &["list-objects"])?;
-
     parse_nodes(&pw_cli, &mut graph)?;
-    parse_ports(&output_ports, &mut graph, PortDirection::Output)?;
-    parse_ports(&input_ports, &mut graph, PortDirection::Input)?;
+
+    let output_ports = run_cmd("pw-link", &["-o"])?;
+    let input_ports = run_cmd("pw-link", &["-i"])?;
+    add_ports(&output_ports, &mut graph, PortDirection::Output);
+    add_ports(&input_ports, &mut graph, PortDirection::Input);
+
+    let links_output = run_cmd("pw-link", &["-l"])?;
     parse_links(&links_output, &mut graph)?;
 
     Ok(graph)
@@ -88,62 +89,55 @@ fn parse_nodes(output: &str, graph: &mut AudioGraph) -> Result<()> {
     Ok(())
 }
 
-fn parse_ports(output: &str, graph: &mut AudioGraph, direction: PortDirection) -> Result<()> {
+fn add_ports(output: &str, graph: &mut AudioGraph, direction: PortDirection) {
     for line in output.lines() {
         let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with("Port") || trimmed.starts_with("id") {
+        if trimmed.is_empty() {
             continue;
         }
 
-        let parts: Vec<&str> = trimmed.splitn(2, ':').collect();
-        if parts.len() < 2 {
-            continue;
-        }
+        let (node_name, port_name) = match trimmed.split_once(':') {
+            Some((n, p)) => (n, p),
+            None => continue,
+        };
 
-        let port_name = parts[1].to_string();
-        let node_name = parts[0].to_string();
+        let port_id = trimmed.to_string();
 
-        let port_id = format!("{}:{}", node_name, port_name);
-
-        for node in graph.nodes.values_mut() {
-            if node.name == node_name || format!("{}:{}", node.name, port_name) == port_id {
+        if let Some(node) = graph.nodes.values_mut().find(|n| n.name == node_name) {
+            if !node.ports.iter().any(|p| p.id == port_id) {
                 node.ports.push(AudioPort {
-                    id: port_id.clone(),
-                    name: port_name.clone(),
+                    id: port_id,
+                    name: port_name.to_string(),
                     node_id: node.id.clone(),
                     direction: direction.clone(),
                 });
-                break;
             }
         }
     }
-    Ok(())
 }
 
 fn parse_links(output: &str, graph: &mut AudioGraph) -> Result<()> {
-    let mut current_input: Option<String> = None;
+    let mut current_port: Option<String> = None;
 
     for line in output.lines() {
         let trimmed = line.trim();
 
-        if let Some(rest) = trimmed.strip_prefix("|- ") {
-            current_input = Some(rest.to_string());
-        } else if let Some(rest) = trimmed.strip_prefix("  |<- ") {
-            if let Some(ref input) = current_input {
-                let output = rest.to_string();
+        if let Some(rest) = trimmed.strip_prefix("|-> ") {
+            if let Some(ref port) = current_port {
                 graph.links.push(AudioLink {
-                    output_port: output,
-                    input_port: input.clone(),
+                    output_port: port.clone(),
+                    input_port: rest.to_string(),
                 });
             }
-        } else if trimmed.starts_with("  |-> ") {
-            if let Some(ref input) = current_input {
-                let target = trimmed.trim_start_matches("  |-> ");
+        } else if let Some(rest) = trimmed.strip_prefix("|<- ") {
+            if let Some(ref port) = current_port {
                 graph.links.push(AudioLink {
-                    output_port: input.clone(),
-                    input_port: target.to_string(),
+                    output_port: rest.to_string(),
+                    input_port: port.clone(),
                 });
             }
+        } else if !trimmed.is_empty() && !trimmed.starts_with('|') {
+            current_port = Some(trimmed.to_string());
         }
     }
     Ok(())
