@@ -243,14 +243,21 @@ impl LotusAudioApp {
                 ui.separator();
                 ui.add_space(4.0);
 
-                egui::ScrollArea::horizontal()
-                    .auto_shrink(false)
-                    .show(ui, |ui| {
-                        ui.horizontal(|ui| {
-                            let mut new_hover: Option<String> = None;
-                            let col_width = 180.0;
+                let avail = ui.available_width();
+                let num = zone_data.len().max(1);
+                let raw_col = (avail - (num as f32 * 8.0) - 24.0) / num as f32;
+                let col_width = raw_col.clamp(120.0, 220.0);
+                let needs_scroll = raw_col < 120.0;
 
-                            for (sink_id, sink_name, pills) in &zone_data {
+                let mut scroll = egui::ScrollArea::horizontal().auto_shrink(false);
+                if !needs_scroll {
+                    scroll = scroll.max_width(avail);
+                }
+                scroll.show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        let mut new_hover: Option<String> = None;
+
+                        for (sink_id, sink_name, pills) in &zone_data {
                                 let is_hover_zone = self.dragging_source.is_some()
                                     && self.drag_hover_zone.as_deref() == Some(sink_id);
 
@@ -272,7 +279,7 @@ impl LotusAudioApp {
                                 ui.allocate_space(Vec2::new(col_width, col_height));
 
                                 frame.show(ui, |ui| {
-                                    ui.set_min_width(col_width - 20.0);
+                                    ui.set_width(col_width - 20.0);
 
                                     ui.vertical(|ui| {
                                         ui.label(egui::RichText::new("◆").color(a).size(12.0));
