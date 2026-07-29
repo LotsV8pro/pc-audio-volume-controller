@@ -245,8 +245,8 @@ impl LotusAudioApp {
 
                 let avail = ui.available_width();
                 let num = zone_data.len().max(1);
-                let raw_col = (avail - (num as f32 * 8.0) - 24.0) / num as f32;
-                let col_width = raw_col.clamp(120.0, 220.0);
+                let raw_col = (avail - (num as f32 * 6.0) - 16.0) / num as f32;
+                let col_width = raw_col.clamp(120.0, 160.0);
                 let needs_scroll = raw_col < 120.0;
 
                 let mut scroll = egui::ScrollArea::horizontal().auto_shrink(false);
