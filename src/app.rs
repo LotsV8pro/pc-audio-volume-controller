@@ -190,7 +190,14 @@ impl LotusAudioApp {
 
                                 ui.vertical(|ui| {
                                     ui.label(egui::RichText::new("◆").color(a).size(12.0));
-                                    ui.label(egui::RichText::new(sink_name).color(txt).size(14.0).strong());
+                                    let display_name = self.graph.nodes.get(sink_id)
+                                .map(|n| if n.description.is_empty() || n.description == n.name {
+                                    n.name.clone()
+                                } else {
+                                    n.description.clone()
+                                })
+                                .unwrap_or_else(|| sink_name.clone());
+                            ui.label(egui::RichText::new(display_name).color(txt).size(14.0).strong());
                                     ui.add_space(2.0);
 
                                     if let Some(mut_node) = self.graph.nodes.get_mut(sink_id) {
@@ -231,10 +238,17 @@ impl LotusAudioApp {
                                             if response.hovered() || pill_hover {
                                                 p.rect_stroke(rect, 6.0, egui::Stroke::new(1.0_f32, a_dim), egui::StrokeKind::Outside);
                                             }
+                                            let pill_label = self.graph.nodes.get(source_id)
+                                                .map(|n| if n.description.is_empty() || n.description == n.name {
+                                                    n.name.clone()
+                                                } else {
+                                                    n.description.clone()
+                                                })
+                                                .unwrap_or_else(|| source_name.clone());
                                             p.text(
                                                 egui::Pos2::new(rect.left() + 8.0, rect.center().y),
                                                 egui::Align2::LEFT_CENTER,
-                                                source_name,
+                                                pill_label,
                                                 egui::FontId::proportional(11.0),
                                                 txt,
                                             );
@@ -258,6 +272,57 @@ impl LotusAudioApp {
                         }
 
                         self.drag_hover_zone = new_hover;
+
+                        let all_linked_source_ids: std::collections::HashSet<String> = zone_data.iter()
+                            .flat_map(|(_, _, _, pills)| pills.iter().map(|(id, _)| id.clone()))
+                            .collect();
+
+                        let all_source_ids: Vec<String> = self.graph.sources().iter().map(|n| n.id.clone()).collect();
+                        let disconnected: Vec<(String, String)> = all_source_ids.iter()
+                            .filter_map(|id| {
+                                if all_linked_source_ids.contains(id) { return None; }
+                                self.graph.nodes.get(id).map(|n| (id.clone(), n.name.clone()))
+                            })
+                            .collect();
+
+                        if !disconnected.is_empty() {
+                            ui.add_space(16.0);
+                            Frame {
+                                fill: card,
+                                corner_radius: CornerRadius::same(8),
+                                inner_margin: Margin::symmetric(10, 8),
+                                ..Default::default()
+                            }.show(ui, |ui| {
+                                ui.label(egui::RichText::new("◈ DISCONNECTED").color(a_dim).size(12.0));
+                                ui.separator();
+                                ui.add_space(4.0);
+                                for (source_id, source_name) in &disconnected {
+                                    let pill_fill = card_light;
+                                    let desired_size = Vec2::new(140.0, 26.0);
+                                    let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
+                                    let p = ui.painter();
+                                    p.rect_filled(rect, 6.0, pill_fill);
+                                    let pill_label = self.graph.nodes.get(source_id)
+                                        .map(|n| if n.description.is_empty() || n.description == n.name {
+                                            n.name.clone()
+                                        } else {
+                                            n.description.clone()
+                                        })
+                                        .unwrap_or_else(|| source_name.clone());
+                                    p.text(
+                                        egui::Pos2::new(rect.left() + 8.0, rect.center().y),
+                                        egui::Align2::LEFT_CENTER,
+                                        pill_label,
+                                        egui::FontId::proportional(11.0),
+                                        txt,
+                                    );
+                                    if response.drag_started() {
+                                        self.dragging_source = Some(source_id.clone());
+                                    }
+                                    ui.add_space(4.0);
+                                }
+                            });
+                        }
                     });
                 });
             });
