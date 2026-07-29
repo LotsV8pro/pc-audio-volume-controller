@@ -1,0 +1,12 @@
+[package]
+name = "lotus-audio"
+version = "0.1.0"
+edition = "2021"
+description = "Visual PipeWire audio router — Sonar-like interface for Linux"
+
+[dependencies]
+eframe = "0.31"
+egui = "0.31"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"

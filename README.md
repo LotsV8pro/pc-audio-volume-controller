@@ -1,20 +1,20 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Electron-141218?style=for-the-badge&logo=electron&logoColor=C4A8E2"/>
-  <img src="https://img.shields.io/badge/Audio_Mixer-141218?style=for-the-badge&logo=pipewire&logoColor=C4A8E2"/>
-  <img src="https://img.shields.io/badge/WIP-141218?style=for-the-badge&logo=codeforces&logoColor=C4A8E2"/>
+  <img src="https://img.shields.io/badge/Rust-141218?style=for-the-badge&logo=rust&logoColor=C4A8E2"/>
+  <img src="https://img.shields.io/badge/egui-141218?style=for-the-badge&logo=codeforces&logoColor=C4A8E2"/>
+  <img src="https://img.shields.io/badge/PipeWire-141218?style=for-the-badge&logo=pipewire&logoColor=C4A8E2"/>
 </p>
 
-<h1 align="center">◈ PC AUDIO VOLUME CONTROLLER ◈</h1>
+<h1 align="center">◈ LOTUS AUDIO ◈</h1>
 
 <p align="center">
-  <b>Visual per-application audio mixer — Sonar-like interface for Linux</b><br>
-  <sub>Electron app · PipeWire integration · Keyboard + GUI control</sub>
+  <b>Visual PipeWire audio router — Sonar-like interface for Linux</b><br>
+  <sub>Rust + egui · real-time node graph · drag-and-drop routing</sub>
 </p>
 
 <p align="center">
   <a href="#-features">Features</a> •
+  <a href="#-build">Build</a> •
   <a href="#-roadmap">Roadmap</a> •
-  <a href="#-install">Install</a> •
   <a href="#-usage">Usage</a>
 </p>
 
@@ -22,54 +22,47 @@
 
 ## ◈ Features
 
-- Per-application volume sliders (Music, Browser, System, Games)
-- Keyboard shortcuts (F13–F22) for quick adjustments
-- Mute/unmute all with a single key
-- Reset all volumes to 50%
-- Electron GUI with real-time slider feedback
+- **Real-time PipeWire node discovery** — detects all audio sinks, sources, and stream nodes
+- **Visual connection graph** — see all ports and their routing at a glance
+- **Per-node volume control** — individual sliders for every audio node
+- **Remove connections** — click ✕ to disconnect any route
+- **Lotus Purple theme** — matches the Lotus-Arch desktop aesthetic
+
+## ◈ Build
+
+```bash
+# Dependencies
+sudo pacman -S pipewire
+
+# Build & run
+git clone https://github.com/LotsV8pro/pc-audio-volume-controller.git
+cd pc-audio-volume-controller
+cargo run --release
+```
+
+Requires Rust 1.70+ and a running PipeWire session.
 
 ## ◈ Roadmap
 
-The goal is to evolve this into a **Sonar-like visual audio routing matrix**:
-
-- [x] Per-app volume sliders
-- [ ] Real-time PipeWire node detection (all active audio streams)
-- [ ] Drag-and-drop audio routing between apps and outputs
-- [ ] Visual connection graph (like `pw-link` but graphical)
+- [x] PipeWire node discovery (`pw-cli` + `pw-link`)
+- [x] Connection graph viewer
+- [x] Per-node volume sliders
+- [ ] Drag-and-drop port connections
+- [ ] Create/remove links from the UI
+- [ ] Real-time monitoring with `pw-link -m`
 - [ ] Per-application EQ profiles
 - [ ] Virtual device creation (loopback, combined sinks)
-- [ ] System tray integration
 - [ ] Save/load routing presets
-
-## ◈ Install
-
-```bash
-git clone https://github.com/LotsV8pro/pc-audio-volume-controller.git
-cd pc-audio-volume-controller
-npm install
-npm start
-```
-
-A web demo is also available at `web-version.html`.
-
-## ◈ Usage
-
-### GUI
-
-Launch the app to see sliders for each configured audio source.
-
-### Keyboard Shortcuts
-
-| Key | Action |
-|---|---|
-| `F13` / `F14` | Music Player volume ± |
-| `F15` / `F16` | Browser volume ± |
-| `F17` / `F18` | System Sounds volume ± |
-| `F19` / `F20` | Games volume ± |
-| `F21` | Mute/unmute all |
-| `F22` | Reset all to 50% |
+- [ ] System tray integration
+- [ ] Keyboard shortcuts
 
 ---
+
+<p align="center">
+  <a href="https://github.com/LotsV8pro/Lotus-Arch"><img src="https://img.shields.io/badge/Lotus_Arch-141218?style=flat-square&logo=arch-linux&logoColor=C4A8E2"/></a>
+  <a href="https://github.com/LotsV8pro/lotus-spotify"><img src="https://img.shields.io/badge/Lotus_Spotify-141218?style=flat-square&logo=spotify&logoColor=C4A8E2"/></a>
+  <a href="https://github.com/LotsV8pro/lotus-discord"><img src="https://img.shields.io/badge/Lotus_Discord-141218?style=flat-square&logo=discord&logoColor=C4A8E2"/></a>
+</p>
 
 <p align="center">
   <sub>MIT License — <a href="https://github.com/LotsV8pro">@LotsV8pro</a></sub>
