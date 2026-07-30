@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Lotus Audio
+Comment=Visual PipeWire audio router
+Exec=lotus-audio
+Icon=audio-card
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;
+StartupNotify=false

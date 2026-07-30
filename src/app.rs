@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use eframe::egui::{self, Color32, CornerRadius, Frame, Margin, Vec2};
+use eframe::egui::{self, Color32, CornerRadius, Frame, Margin, Rect, Vec2};
 
 use crate::graph::AudioGraph;
 use crate::pipewire;
@@ -9,7 +9,6 @@ pub struct LotusAudioApp {
     error: Option<String>,
 
     dragging_source: Option<String>,
-    drag_hover_zone: Option<String>,
 
     refresh_timer: f64,
     auto_refresh: bool,
@@ -25,7 +24,6 @@ impl Default for LotusAudioApp {
             graph: AudioGraph::new(),
             error: None,
             dragging_source: None,
-            drag_hover_zone: None,
             refresh_timer: 0.0,
             auto_refresh: true,
             show_settings: false,
@@ -43,9 +41,18 @@ impl LotusAudioApp {
     }
 
     fn refresh(&mut self) {
+        let old_volumes: std::collections::HashMap<String, f32> = self.graph.nodes.iter()
+            .map(|(k, v)| (k.clone(), v.volume))
+            .collect();
+
         match pipewire::fetch_graph() {
             Ok(graph) => {
                 self.graph = graph;
+                for (id, vol) in old_volumes {
+                    if let Some(node) = self.graph.nodes.get_mut(&id) {
+                        node.volume = vol;
+                    }
+                }
                 self.error = None;
 
                 let current: Vec<(String, String)> = self.graph.sinks().iter()
@@ -60,7 +67,6 @@ impl LotusAudioApp {
                 let prev_ids: HashSet<String> = self.all_sink_ids_snapshot.iter().map(|(id, _)| id.clone()).collect();
                 let truly_new: HashSet<String> = current_ids.difference(&prev_ids).cloned().collect();
                 self.enabled_sinks.extend(truly_new);
-                self.enabled_sinks.retain(|id| current_ids.contains(id));
 
                 if self.all_sink_ids_snapshot != current {
                     self.all_sink_ids_snapshot = current;
@@ -128,18 +134,6 @@ impl eframe::App for LotusAudioApp {
         style.visuals.selection.stroke.color = a;
         style.visuals.selection.bg_fill = Color32::from_rgba_premultiplied(0xC4, 0xA8, 0xE2, 40);
         ctx.set_style(style);
-
-        let pointer_released = ctx.input(|i| i.pointer.any_released());
-
-        if pointer_released {
-            if let (Some(src), Some(zone)) = (self.dragging_source.clone(), self.drag_hover_zone.clone()) {
-                if src != zone {
-                    self.try_relink_source(&src, &zone);
-                }
-            }
-            self.dragging_source = None;
-            self.drag_hover_zone = None;
-        }
 
         let dt = ctx.input(|i| i.unstable_dt) as f64;
         self.refresh_timer += dt;
@@ -232,6 +226,7 @@ impl LotusAudioApp {
             .collect();
 
         let pointer_pos = ctx.input(|i| i.pointer.hover_pos());
+        let pointer_released = ctx.input(|i| i.pointer.any_released());
 
         egui::CentralPanel::default()
             .frame(Frame { fill: bg, inner_margin: Margin::symmetric(8, 8), ..Default::default() })
@@ -239,13 +234,16 @@ impl LotusAudioApp {
                 ui.horizontal(|ui| {
                     ui.label(egui::RichText::new("◈ AUDIO ROUTER").color(a).size(14.0));
                     ui.label(egui::RichText::new(format!("{} zones", zone_data.len())).color(dim).size(11.0));
+                    if self.dragging_source.is_some() {
+                        ui.label(egui::RichText::new("drag to a zone").color(a_dim).size(11.0));
+                    }
                 });
                 ui.separator();
                 ui.add_space(4.0);
 
                 let avail = ui.available_width();
                 let num = zone_data.len().max(1);
-                let raw_col = (avail - (num as f32 * 6.0) - 16.0) / num as f32;
+                let raw_col = (avail - (num as f32 * 4.0) - 8.0) / num as f32;
                 let col_width = raw_col.clamp(120.0, 160.0);
                 let needs_scroll = raw_col < 120.0;
 
@@ -255,151 +253,162 @@ impl LotusAudioApp {
                 }
                 scroll.show(ui, |ui| {
                     ui.horizontal(|ui| {
-                        let mut new_hover: Option<String> = None;
+                        let mut zone_rects: Vec<(String, Rect)> = Vec::new();
 
                         for (sink_id, sink_name, pills) in &zone_data {
-                                let is_hover_zone = self.dragging_source.is_some()
-                                    && self.drag_hover_zone.as_deref() == Some(sink_id);
+                            let inner = Frame {
+                                fill: card,
+                                corner_radius: CornerRadius::same(10),
+                                stroke: egui::Stroke::new(0.0_f32, a_dim),
+                                inner_margin: Margin::symmetric(10, 8),
+                                ..Default::default()
+                            }.show(ui, |ui| {
+                                ui.set_width(col_width - 20.0);
 
-                                let zone_fill = if is_hover_zone {
-                                    Color32::from_rgb(0x38, 0x20, 0x48)
-                                } else {
-                                    card
-                                };
+                                ui.vertical(|ui| {
+                                    let display_name = self.sink_display_name(sink_id, sink_name);
 
-                                let frame = Frame {
-                                    fill: zone_fill,
-                                    corner_radius: CornerRadius::same(10),
-                                    stroke: egui::Stroke::new(if is_hover_zone { 1.5_f32 } else { 0.0_f32 }, a_dim),
-                                    inner_margin: Margin::symmetric(10, 8),
-                                    ..Default::default()
-                                };
+                                    ui.label(egui::RichText::new("◆").color(a).size(12.0));
+                                    ui.label(egui::RichText::new(display_name).color(txt).size(14.0).strong());
+                                    ui.add_space(2.0);
 
-                                let col_height = ui.available_height().max(300.0);
-                                let (_id, col_rect) = ui.allocate_space(Vec2::new(col_width, col_height));
-
-                                frame.show(ui, |ui| {
-                                    ui.set_width(col_width - 20.0);
-
-                                    ui.vertical(|ui| {
-                                        ui.label(egui::RichText::new("◆").color(a).size(12.0));
-                                        let display_name = self.sink_display_name(sink_id, sink_name);
-                                        ui.label(egui::RichText::new(display_name).color(txt).size(14.0).strong());
-                                        ui.add_space(2.0);
-
-                                        if let Some(mut_node) = self.graph.nodes.get_mut(sink_id) {
-                                            ui.set_min_height(60.0);
-                                            let resp = ui.add(
-                                                egui::Slider::new(&mut mut_node.volume, 0.0..=1.5)
-                                                    .show_value(false)
-                                                    .trailing_fill(true)
-                                                    .vertical()
-                                            );
-                                            if resp.drag_stopped() {
-                                                let _ = pipewire::set_node_volume(sink_name, mut_node.volume);
-                                            }
-                                            let vol_pct = (mut_node.volume * 100.0) as u32;
-                                            ui.label(egui::RichText::new(format!("{}%", vol_pct)).color(a_dim).size(10.0));
+                                    if let Some(mut_node) = self.graph.nodes.get_mut(sink_id) {
+                                        ui.set_min_height(60.0);
+                                        let resp = ui.add(
+                                            egui::Slider::new(&mut mut_node.volume, 0.0..=1.5)
+                                                .show_value(false)
+                                                .trailing_fill(true)
+                                                .vertical()
+                                        );
+                                        if resp.drag_stopped() {
+                                            let _ = pipewire::set_node_volume(sink_name, mut_node.volume);
                                         }
+                                        let vol_pct = (mut_node.volume * 100.0) as u32;
+                                        ui.label(egui::RichText::new(format!("{}%", vol_pct)).color(a_dim).size(10.0));
+                                    }
 
-                                        ui.add_space(6.0);
-                                        ui.separator();
-                                        ui.add_space(4.0);
-
-                                        if pills.is_empty() {
-                                            ui.label(egui::RichText::new("—").color(dim).size(11.0));
-                                        } else {
-                                            for (source_id, source_name) in pills {
-                                                let pill_hover = self.dragging_source.as_deref() == Some(source_id);
-                                                let pill_fill = if pill_hover {
-                                                    Color32::from_rgb(0x4C, 0x3C, 0x5C)
-                                                } else {
-                                                    card_light
-                                                };
-
-                                                let desired_size = Vec2::new(col_width - 20.0, 26.0);
-                                                let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
-
-                                                let p = ui.painter();
-                                                p.rect_filled(rect, 6.0, pill_fill);
-                                                if response.hovered() || pill_hover {
-                                                    p.rect_stroke(rect, 6.0, egui::Stroke::new(1.0_f32, a_dim), egui::StrokeKind::Outside);
-                                                }
-                                                let pill_label = self.source_display_name(source_id, source_name);
-                                                p.text(
-                                                    egui::Pos2::new(rect.left() + 8.0, rect.center().y),
-                                                    egui::Align2::LEFT_CENTER,
-                                                    pill_label,
-                                                    egui::FontId::proportional(11.0),
-                                                    txt,
-                                                );
-
-                                                if response.drag_started() {
-                                                    self.dragging_source = Some(source_id.clone());
-                                                }
-
-                                                ui.add_space(4.0);
-                                            }
-                                        }
-
-                                        if let Some(pos) = pointer_pos {
-                                            if col_rect.contains(pos) && self.dragging_source.is_some() {
-                                                new_hover = Some(sink_id.clone());
-                                            }
-                                        }
-                                    });
-                                });
-                                ui.add_space(8.0);
-                            }
-
-                            self.drag_hover_zone = new_hover;
-
-                            let all_linked_source_ids: HashSet<String> = zone_data.iter()
-                                .flat_map(|(_, _, pills)| pills.iter().map(|(id, _)| id.clone()))
-                                .collect();
-
-                            let all_source_ids: Vec<String> = self.graph.sources().iter().map(|n| n.id.clone()).collect();
-                            let disconnected: Vec<(String, String)> = all_source_ids.iter()
-                                .filter_map(|id| {
-                                    if all_linked_source_ids.contains(id) { return None; }
-                                    self.graph.nodes.get(id).map(|n| (id.clone(), n.name.clone()))
-                                })
-                                .collect();
-
-                            if !disconnected.is_empty() {
-                                ui.add_space(16.0);
-                                Frame {
-                                    fill: card,
-                                    corner_radius: CornerRadius::same(8),
-                                    inner_margin: Margin::symmetric(10, 8),
-                                    ..Default::default()
-                                }.show(ui, |ui| {
-                                    ui.label(egui::RichText::new("◈ DISCONNECTED").color(a_dim).size(12.0));
+                                    ui.add_space(6.0);
                                     ui.separator();
                                     ui.add_space(4.0);
-                                    for (source_id, source_name) in &disconnected {
-                                        let pill_fill = card_light;
-                                        let desired_size = Vec2::new(140.0, 26.0);
-                                        let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
-                                        let p = ui.painter();
-                                        p.rect_filled(rect, 6.0, pill_fill);
-                                        let pill_label = self.source_display_name(source_id, source_name);
-                                        p.text(
-                                            egui::Pos2::new(rect.left() + 8.0, rect.center().y),
-                                            egui::Align2::LEFT_CENTER,
-                                            pill_label,
-                                            egui::FontId::proportional(11.0),
-                                            txt,
-                                        );
-                                        if response.drag_started() {
-                                            self.dragging_source = Some(source_id.clone());
+
+                                    if pills.is_empty() {
+                                        ui.label(egui::RichText::new("—").color(dim).size(11.0));
+                                    } else {
+                                        for (source_id, source_name) in pills {
+                                            let is_dragging = self.dragging_source.as_deref() == Some(source_id);
+                                            let pill_fill = if is_dragging {
+                                                Color32::from_rgb(0x4C, 0x3C, 0x5C)
+                                            } else {
+                                                card_light
+                                            };
+
+                                            let desired_size = Vec2::new(col_width - 20.0, 26.0);
+                                            let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
+
+                                            let p = ui.painter();
+                                            p.rect_filled(rect, 6.0, pill_fill);
+                                            if is_dragging {
+                                                p.rect_stroke(rect, 6.0, egui::Stroke::new(1.5_f32, a), egui::StrokeKind::Outside);
+                                            } else if response.hovered() {
+                                                p.rect_stroke(rect, 6.0, egui::Stroke::new(1.0_f32, a_dim), egui::StrokeKind::Outside);
+                                            }
+                                            let pill_label = self.source_display_name(source_id, source_name);
+                                            p.text(
+                                                egui::Pos2::new(rect.left() + 8.0, rect.center().y),
+                                                egui::Align2::LEFT_CENTER,
+                                                pill_label,
+                                                egui::FontId::proportional(11.0),
+                                                txt,
+                                            );
+
+                                            if response.drag_started() {
+                                                self.dragging_source = Some(source_id.clone());
+                                            }
+
+                                            ui.add_space(1.0);
                                         }
-                                        ui.add_space(4.0);
                                     }
                                 });
+                            });
+
+                            zone_rects.push((sink_id.clone(), inner.response.rect));
+                            ui.add_space(4.0);
+                        }
+
+                        // Process drop
+                        if let Some(pos) = pointer_pos {
+                            if pointer_released && self.dragging_source.is_some() {
+                                for (sid, rect) in &zone_rects {
+                                    if rect.contains(pos) {
+                                        if let Some(ref src) = self.dragging_source.clone() {
+                                            let already_here = zone_data.iter()
+                                                .find(|(zid, _, _)| zid == sid)
+                                                .map_or(false, |(_, _, pills)| pills.iter().any(|(id, _)| id == src));
+                                            if !already_here {
+                                                self.try_relink_source(src, sid);
+                                            }
+                                        }
+                                        break;
+                                    }
+                                }
+                                self.dragging_source = None;
                             }
-                        });
+                        }
+
+                        let all_linked_source_ids: HashSet<String> = zone_data.iter()
+                            .flat_map(|(_, _, pills)| pills.iter().map(|(id, _)| id.clone()))
+                            .collect();
+
+                        let all_source_ids: Vec<String> = self.graph.sources().iter().map(|n| n.id.clone()).collect();
+                        let disconnected: Vec<(String, String)> = all_source_ids.iter()
+                            .filter_map(|id| {
+                                if all_linked_source_ids.contains(id) { return None; }
+                                self.graph.nodes.get(id).map(|n| (id.clone(), n.name.clone()))
+                            })
+                            .collect();
+
+                        if !disconnected.is_empty() {
+                            ui.add_space(12.0);
+                            Frame {
+                                fill: card,
+                                corner_radius: CornerRadius::same(8),
+                                inner_margin: Margin::symmetric(10, 8),
+                                ..Default::default()
+                            }.show(ui, |ui| {
+                                ui.label(egui::RichText::new("◈ DISCONNECTED").color(a_dim).size(12.0));
+                                ui.separator();
+                                ui.add_space(4.0);
+                                for (source_id, source_name) in &disconnected {
+                                    let is_dragging = self.dragging_source.as_deref() == Some(source_id);
+                                    let pill_fill = if is_dragging {
+                                        Color32::from_rgb(0x4C, 0x3C, 0x5C)
+                                    } else {
+                                        card_light
+                                    };
+                                    let desired_size = Vec2::new(140.0, 26.0);
+                                    let (rect, response) = ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
+                                    let p = ui.painter();
+                                    p.rect_filled(rect, 6.0, pill_fill);
+                                    if is_dragging {
+                                        p.rect_stroke(rect, 6.0, egui::Stroke::new(1.5_f32, a), egui::StrokeKind::Outside);
+                                    }
+                                    let pill_label = self.source_display_name(source_id, source_name);
+                                    p.text(
+                                        egui::Pos2::new(rect.left() + 8.0, rect.center().y),
+                                        egui::Align2::LEFT_CENTER,
+                                        pill_label,
+                                        egui::FontId::proportional(11.0),
+                                        txt,
+                                    );
+                                    if response.drag_started() {
+                                        self.dragging_source = Some(source_id.clone());
+                                    }
+                                    ui.add_space(1.0);
+                                }
+                            });
+                        }
                     });
+                });
             });
     }
 }
