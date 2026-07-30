@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="#-features">Features</a> •
-  <a href="#-build">Build</a> •
-  <a href="#-roadmap">Roadmap</a> •
-  <a href="#-usage">Usage</a>
+  <a href="#-install">Install</a> •
+  <a href="#-usage">Usage</a> •
+  <a href="#-build-from-source">Build</a>
 </p>
 
 ---
@@ -23,38 +23,60 @@
 ## ◈ Features
 
 - **Real-time PipeWire node discovery** — detects all audio sinks, sources, and stream nodes
-- **Visual connection graph** — see all ports and their routing at a glance
-- **Per-node volume control** — individual sliders for every audio node
-- **Remove connections** — click ✕ to disconnect any route
-- **Lotus Purple theme** — matches the Lotus-Arch desktop aesthetic
+- **Per-zone volume control** — vertical faders for every output zone
+- **Drag-and-drop routing** — drag any app pill onto a zone column to route it there
+- **Disconnected stream monitor** — shows orphaned streams not linked to any zone
+- **Zone visibility toggles** — show/hide zones from the settings panel
+- **Volume persistence** — volume levels survive graph refreshes
+- **Lotus Purple theme** — dark aesthetic matching Lotus-Arch
 
-## ◈ Build
+## ◈ Install
+
+### From source (requires Rust)
 
 ```bash
-# Dependencies
-sudo pacman -S pipewire
-
-# Build & run
 git clone https://github.com/LotsV8pro/pc-audio-volume-controller.git
 cd pc-audio-volume-controller
-cargo run --release
+make install      # builds + installs to /usr/local
 ```
 
-Requires Rust 1.70+ and a running PipeWire session.
+Or manually:
 
-## ◈ Roadmap
+```bash
+cargo build --release
+sudo install -Dm755 target/release/lotus-audio /usr/local/bin/lotus-audio
+sudo install -Dm644 lotus-audio.desktop /usr/local/share/applications/lotus-audio.desktop
+```
 
-- [x] PipeWire node discovery (`pw-cli` + `pw-link`)
-- [x] Connection graph viewer
-- [x] Per-node volume sliders
-- [ ] Drag-and-drop port connections
-- [ ] Create/remove links from the UI
-- [ ] Real-time monitoring with `pw-link -m`
-- [ ] Per-application EQ profiles
-- [ ] Virtual device creation (loopback, combined sinks)
-- [ ] Save/load routing presets
-- [ ] System tray integration
-- [ ] Keyboard shortcuts
+### Dependencies
+
+- A running **PipeWire** session (pipewire, pipewire-pulse)
+- **Rust** 1.70+ (`rustc`, `cargo`)
+
+## ◈ Usage
+
+```bash
+lotus-audio
+```
+
+- **Route an app** — drag a pill (app name) from any zone column and drop it onto another zone
+- **Adjust volume** — drag the vertical slider in any zone column
+- **Toggle zones** — click the ⚙ button in the top bar, check/uncheck zones
+- **Refresh** — click ↻ or enable Auto-refresh toggle
+
+## ◈ Build from source
+
+```bash
+git clone https://github.com/LotsV8pro/pc-audio-volume-controller.git
+cd pc-audio-volume-controller
+cargo build --release
+```
+
+Requires Rust 1.70+ and a running PipeWire session. PipeWire libraries are accessed at runtime via `pw-cli` and `pw-link` — no build-time dependency.
+
+## ◈ Windows / macOS
+
+PipeWire is a Linux audio server. This app **will not work** on Windows or macOS without a complete audio backend replacement (WASAPI / CoreAudio). A cross-platform backend is not currently planned.
 
 ---
 
