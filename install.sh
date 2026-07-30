@@ -21,4 +21,9 @@ sudo install -Dm755 target/release/lotus-audio "${PREFIX}/bin/lotus-audio"
 echo "→ Installing desktop entry..."
 sudo install -Dm644 lotus-audio.desktop "${PREFIX}/share/applications/lotus-audio.desktop"
 
+if command -v update-desktop-database &>/dev/null; then
+    echo "→ Updating desktop database..."
+    sudo update-desktop-database "${PREFIX}/share/applications" 2>/dev/null || true
+fi
+
 echo "✓ Done. Run: lotus-audio"
