@@ -32,20 +32,18 @@
 
 ## ◈ Install
 
-### From source (requires Rust)
-
 ```bash
 git clone https://github.com/LotsV8pro/pc-audio-volume-controller.git
 cd pc-audio-volume-controller
-make install      # builds + installs to /usr/local
+./install.sh
 ```
 
 Or manually:
 
 ```bash
 cargo build --release
-sudo install -Dm755 target/release/lotus-audio /usr/local/bin/lotus-audio
-sudo install -Dm644 lotus-audio.desktop /usr/local/share/applications/lotus-audio.desktop
+sudo install target/release/lotus-audio /usr/local/bin/
+sudo install lotus-audio.desktop /usr/local/share/applications/
 ```
 
 ### Dependencies
