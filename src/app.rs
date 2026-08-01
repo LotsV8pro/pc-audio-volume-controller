@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use eframe::egui::{self, Color32, CornerRadius, Frame, Margin, Rect, Vec2};
 
+use crate::config::AppConfig;
 use crate::graph::AudioGraph;
 use crate::pipewire;
 
@@ -15,7 +16,10 @@ pub struct LotusAudioApp {
 
     show_settings: bool,
     enabled_sinks: HashSet<String>,
-    all_sink_ids_snapshot: Vec<(String, String)>,
+    all_sink_ids_snapshot: Vec<(String, String, String)>,
+
+    config: AppConfig,
+    config_initialized: bool,
 }
 
 impl Default for LotusAudioApp {
@@ -29,6 +33,8 @@ impl Default for LotusAudioApp {
             show_settings: false,
             enabled_sinks: HashSet::new(),
             all_sink_ids_snapshot: Vec::new(),
+            config: crate::config::load(),
+            config_initialized: false,
         };
         app.refresh();
         app
@@ -48,25 +54,62 @@ impl LotusAudioApp {
         match pipewire::fetch_graph() {
             Ok(graph) => {
                 self.graph = graph;
-                for (id, vol) in old_volumes {
-                    if let Some(node) = self.graph.nodes.get_mut(&id) {
-                        node.volume = vol;
+
+                if self.config_initialized {
+                    for (id, vol) in old_volumes {
+                        if let Some(node) = self.graph.nodes.get_mut(&id) {
+                            node.volume = vol;
+                        }
+                    }
+                } else {
+                    let sink_ids: Vec<String> = self.graph.sinks().iter().map(|n| n.id.clone()).collect();
+                    for id in &sink_ids {
+                        if let Some((vol, _)) = pipewire::get_node_volume(id) {
+                            if let Some(node) = self.graph.nodes.get_mut(id) {
+                                node.volume = vol;
+                            }
+                        }
                     }
                 }
                 self.error = None;
 
-                let current: Vec<(String, String)> = self.graph.sinks().iter()
-                    .map(|n| (n.id.clone(), if n.description.is_empty() || n.description == n.name {
-                        n.name.clone()
-                    } else {
-                        n.description.clone()
-                    }))
+                let current: Vec<(String, String, String)> = self.graph.sinks().iter()
+                    .map(|n| {
+                        let display = if n.description.is_empty() || n.description == n.name {
+                            n.name.clone()
+                        } else {
+                            n.description.clone()
+                        };
+                        (n.id.clone(), n.name.clone(), display)
+                    })
                     .collect();
 
-                let current_ids: HashSet<String> = current.iter().map(|(id, _)| id.clone()).collect();
-                let prev_ids: HashSet<String> = self.all_sink_ids_snapshot.iter().map(|(id, _)| id.clone()).collect();
+                let current_ids: HashSet<String> = current.iter().map(|(id, _, _)| id.clone()).collect();
+                let prev_ids: HashSet<String> = self.all_sink_ids_snapshot.iter().map(|(id, _, _)| id.clone()).collect();
                 let truly_new: HashSet<String> = current_ids.difference(&prev_ids).cloned().collect();
-                self.enabled_sinks.extend(truly_new);
+
+                if !self.config_initialized {
+                    for (_, name, _) in &current {
+                        if self.config.is_sink_enabled(name) {
+                            self.enabled_sinks.insert(name.clone());
+                        }
+                    }
+                    self.config_initialized = true;
+
+                    for node in self.graph.nodes.values() {
+                        if let Some(vol) = self.config.volumes.get(&node.name) {
+                            let _ = pipewire::set_node_volume(&node.id, *vol);
+                        }
+                    }
+                } else if !truly_new.is_empty() && self.config.enabled_sinks.is_none() {
+                    for id in &truly_new {
+                        let name = current.iter()
+                            .find(|(i, _, _)| i == id)
+                            .map(|(_, n, _)| n.clone())
+                            .unwrap_or_default();
+                        self.enabled_sinks.insert(name);
+                    }
+                }
 
                 if self.all_sink_ids_snapshot != current {
                     self.all_sink_ids_snapshot = current;
@@ -170,21 +213,34 @@ impl eframe::App for LotusAudioApp {
                     ui.separator();
                     egui::ScrollArea::vertical().max_height(400.0).show(ui, |ui| {
                         let items = self.all_sink_ids_snapshot.clone();
-                        for (id, display_name) in &items {
-                            let mut enabled = self.enabled_sinks.contains(id);
+                        let mut changed = false;
+                        for (_, name, display_name) in &items {
+                            let mut enabled = self.enabled_sinks.contains(name);
+                            let before = enabled;
                             ui.checkbox(&mut enabled, display_name);
-                            if enabled {
-                                self.enabled_sinks.insert(id.clone());
-                            } else {
-                                self.enabled_sinks.remove(id);
+                            if enabled != before {
+                                if enabled {
+                                    self.enabled_sinks.insert(name.clone());
+                                } else {
+                                    self.enabled_sinks.remove(name);
+                                }
+                                self.config.set_sink_enabled(name, enabled);
+                                changed = true;
                             }
+                        }
+                        if changed {
+                            crate::config::save(&self.config);
                         }
                     });
                     ui.add_space(8.0);
                     if ui.button("Reset").clicked() {
-                        for (id, _) in &self.all_sink_ids_snapshot {
-                            self.enabled_sinks.insert(id.clone());
+                        for (_, name, _) in &self.all_sink_ids_snapshot {
+                            self.enabled_sinks.insert(name.clone());
                         }
+                        self.config.enabled_sinks = Some(
+                            self.all_sink_ids_snapshot.iter().map(|(_, n, _)| n.clone()).collect(),
+                        );
+                        crate::config::save(&self.config);
                     }
                 });
         }
@@ -210,7 +266,7 @@ impl LotusAudioApp {
         txt: Color32, dim: Color32,
     ) {
         let sink_ids: Vec<String> = self.graph.sinks().iter()
-            .filter(|n| self.enabled_sinks.contains(&n.id))
+            .filter(|n| self.enabled_sinks.contains(&n.name))
             .map(|n| n.id.clone())
             .collect();
 
@@ -281,7 +337,10 @@ impl LotusAudioApp {
                                                 .vertical()
                                         );
                                         if resp.drag_stopped() {
-                                            let _ = pipewire::set_node_volume(sink_name, mut_node.volume);
+                                            let vol = mut_node.volume;
+                                            let _ = pipewire::set_node_volume(sink_id, vol);
+                                            self.config.volumes.insert(sink_name.clone(), vol);
+                                            crate::config::save(&self.config);
                                         }
                                         let vol_pct = (mut_node.volume * 100.0) as u32;
                                         ui.label(egui::RichText::new(format!("{}%", vol_pct)).color(a_dim).size(10.0));
@@ -354,27 +413,30 @@ impl LotusAudioApp {
                                 self.dragging_source = None;
                             }
                         }
+                    });
 
-                        let all_linked_source_ids: HashSet<String> = zone_data.iter()
-                            .flat_map(|(_, _, pills)| pills.iter().map(|(id, _)| id.clone()))
-                            .collect();
+                    let all_linked_source_ids: HashSet<String> = zone_data.iter()
+                        .flat_map(|(_, _, pills)| pills.iter().map(|(id, _)| id.clone()))
+                        .collect();
 
-                        let all_source_ids: Vec<String> = self.graph.sources().iter().map(|n| n.id.clone()).collect();
-                        let disconnected: Vec<(String, String)> = all_source_ids.iter()
-                            .filter_map(|id| {
-                                if all_linked_source_ids.contains(id) { return None; }
-                                self.graph.nodes.get(id).map(|n| (id.clone(), n.name.clone()))
-                            })
-                            .collect();
+                    let all_source_ids: Vec<String> = self.graph.sources().iter().map(|n| n.id.clone()).collect();
+                    let disconnected: Vec<(String, String)> = all_source_ids.iter()
+                        .filter_map(|id| {
+                            if all_linked_source_ids.contains(id) { return None; }
+                            self.graph.nodes.get(id).map(|n| (id.clone(), n.name.clone()))
+                        })
+                        .collect();
 
-                        if !disconnected.is_empty() {
-                            ui.add_space(12.0);
-                            Frame {
-                                fill: card,
-                                corner_radius: CornerRadius::same(8),
-                                inner_margin: Margin::symmetric(10, 8),
-                                ..Default::default()
-                            }.show(ui, |ui| {
+                    if !disconnected.is_empty() {
+                        ui.add_space(12.0);
+                        Frame {
+                            fill: card,
+                            corner_radius: CornerRadius::same(8),
+                            inner_margin: Margin::symmetric(10, 8),
+                            ..Default::default()
+                        }.show(ui, |ui| {
+                            ui.set_max_width(160.0);
+                            ui.vertical(|ui| {
                                 ui.label(egui::RichText::new("◈ DISCONNECTED").color(a_dim).size(12.0));
                                 ui.separator();
                                 ui.add_space(4.0);
@@ -406,8 +468,8 @@ impl LotusAudioApp {
                                     ui.add_space(1.0);
                                 }
                             });
-                        }
-                    });
+                        });
+                    }
                 });
             });
     }
