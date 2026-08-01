@@ -153,12 +153,26 @@ pub fn remove_link(output: &str, input: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn set_node_volume(node_name: &str, volume: f32) -> Result<()> {
-    run_cmd(
-        "pw-cli",
-        &["set-param", node_name, "Props", &format!("{{ volume: {:.3} }}", volume)],
-    )
-    .ok();
+pub fn get_node_volume(node_id: &str) -> Option<(f32, bool)> {
+    let out = run_cmd("wpctl", &["get-volume", node_id]).ok()?;
+    let mut volume: Option<f32> = None;
+    let mut muted = false;
+    let mut toks = out.split_whitespace().peekable();
+    while let Some(tok) = toks.next() {
+        if tok == "Volume:" {
+            if let Some(v) = toks.next() {
+                volume = v.parse::<f32>().ok();
+            }
+        } else if tok == "[MUTED]" {
+            muted = true;
+        }
+    }
+    volume.map(|v| (v, muted))
+}
+
+pub fn set_node_volume(node_id: &str, volume: f32) -> Result<()> {
+    let vol = format!("{:.3}", volume);
+    run_cmd("wpctl", &["set-volume", node_id, &vol]).context("failed to set volume")?;
     Ok(())
 }
 

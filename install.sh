@@ -12,6 +12,11 @@ if ! command -v pw-cli &>/dev/null; then
     echo "Warning: pw-cli not found — make sure PipeWire is installed and running."
 fi
 
+if ! command -v wpctl &>/dev/null; then
+    echo "Error: wpctl not found — install WirePlumber (pipewire-wireplumber)."
+    exit 1
+fi
+
 echo "→ Building lotus-audio (release)..."
 cargo build --release
 
