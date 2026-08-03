@@ -331,7 +331,7 @@ impl LotusAudioApp {
                                     if let Some(mut_node) = self.graph.nodes.get_mut(sink_id) {
                                         ui.set_min_height(60.0);
                                         let resp = ui.add(
-                                            egui::Slider::new(&mut mut_node.volume, 0.0..=1.5)
+                                            egui::Slider::new(&mut mut_node.volume, 0.0..=1.0)
                                                 .show_value(false)
                                                 .trailing_fill(true)
                                                 .vertical()

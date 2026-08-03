@@ -171,7 +171,7 @@ pub fn get_node_volume(node_id: &str) -> Option<(f32, bool)> {
 }
 
 pub fn set_node_volume(node_id: &str, volume: f32) -> Result<()> {
-    let vol = format!("{:.3}", volume);
+    let vol = format!("{:.3}", volume.clamp(0.0, 1.0));
     run_cmd("wpctl", &["set-volume", node_id, &vol]).context("failed to set volume")?;
     Ok(())
 }
