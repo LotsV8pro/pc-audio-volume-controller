@@ -2,7 +2,7 @@
 Name=Lotus Audio
 Comment=Visual PipeWire audio router — Sonar-like interface
 Exec=lotus-audio
-Icon=audio-card
+Icon=lotus-audio
 Terminal=false
 Type=Application
 Categories=Audio;AudioVideo;Mixer;

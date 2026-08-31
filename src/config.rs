@@ -52,9 +52,17 @@ pub fn save(cfg: &AppConfig) {
         return;
     };
     if let Some(dir) = path.parent() {
-        let _ = std::fs::create_dir_all(dir);
+        if let Err(e) = std::fs::create_dir_all(dir) {
+            eprintln!("lotus-audio: could not create config dir {}: {e}", dir.display());
+            return;
+        }
     }
-    if let Ok(data) = serde_json::to_string_pretty(cfg) {
-        let _ = std::fs::write(path, data);
+    match serde_json::to_string_pretty(cfg) {
+        Ok(data) => {
+            if let Err(e) = std::fs::write(&path, data) {
+                eprintln!("lotus-audio: could not save config {}: {e}", path.display());
+            }
+        }
+        Err(e) => eprintln!("lotus-audio: could not serialize config: {e}"),
     }
 }

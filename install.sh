@@ -26,9 +26,13 @@ sudo install -Dm755 target/release/lotus-audio "${PREFIX}/bin/lotus-audio"
 echo "→ Installing desktop entry..."
 sudo install -Dm644 lotus-audio.desktop "${PREFIX}/share/applications/lotus-audio.desktop"
 
+echo "→ Installing icon..."
+sudo install -Dm644 icons/hicolor/scalable/apps/lotus-audio.svg "${PREFIX}/share/icons/hicolor/scalable/apps/lotus-audio.svg"
+
 if command -v update-desktop-database &>/dev/null; then
     echo "→ Updating desktop database..."
     sudo update-desktop-database "${PREFIX}/share/applications" 2>/dev/null || true
+    sudo gtk-update-icon-cache -f -t "${PREFIX}/share/icons/hicolor" 2>/dev/null || true
 fi
 
 echo "✓ Done. Run: lotus-audio"

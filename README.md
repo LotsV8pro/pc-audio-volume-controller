@@ -49,7 +49,10 @@ sudo install lotus-audio.desktop /usr/local/share/applications/
 ### Dependencies
 
 - A running **PipeWire** session (pipewire, pipewire-pulse)
+- **WirePlumber** (`wpctl`) — used at runtime to read/mutate the audio graph
 - **Rust** 1.70+ (`rustc`, `cargo`)
+
+PipeWire libraries are accessed at runtime via `pw-cli`, `pw-link` and `wpctl` — **no build-time dependency** on PipeWire.
 
 ## ◈ Usage
 
