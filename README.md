@@ -4,33 +4,32 @@
   <img src="https://img.shields.io/badge/PipeWire-141218?style=for-the-badge&logo=pipewire&logoColor=C4A8E2"/>
 </p>
 
-<h1 align="center">◈ LOTUS AUDIO ◈</h1>
+<h1 align="center">Lotus Audio</h1>
 
-<p align="center">
-  <b>Visual PipeWire audio router — Sonar-like interface for Linux</b><br>
-  <sub>Rust + egui · real-time node graph · drag-and-drop routing</sub>
-</p>
+A small window that shows the PipeWire audio graph and lets you route each
+application to an output and set its volume, in the style of the SteelSeries
+Sonar mixer. Written in Rust with egui.
 
-<p align="center">
-  <a href="#-features">Features</a> •
-  <a href="#-install">Install</a> •
-  <a href="#-usage">Usage</a> •
-  <a href="#-build-from-source">Build</a>
-</p>
+The window has one column per output (a zone). Inside each column are the
+applications currently playing into it, and a vertical fader for the zone
+volume. Dragging an application from one column to another reconnects its
+streams.
 
----
+## What it does
 
-## ◈ Features
+- Reads the graph with `pw-cli` and `pw-link` and shows sinks, sources and the
+  streams linked to them.
+- Shows a fader per zone, and remembers the volume of each one across refreshes.
+- Moves an application to another output when you drop its pill on that column.
+- Lists streams that are not linked to any zone, so a forgotten application does
+  not disappear from the mixer.
+- Lets you hide the zones you do not use from the settings panel.
+- Refresh is manual or automatic, on a two-second timer.
 
-- **Real-time PipeWire node discovery** — detects all audio sinks, sources, and stream nodes
-- **Per-zone volume control** — vertical faders for every output zone
-- **Drag-and-drop routing** — drag any app pill onto a zone column to route it there
-- **Disconnected stream monitor** — shows orphaned streams not linked to any zone
-- **Zone visibility toggles** — show/hide zones from the settings panel
-- **Volume persistence** — volume levels survive graph refreshes
-- **Lotus Purple theme** — dark aesthetic matching Lotus-Arch
+The graph is queried by calling the PipeWire command line tools, so the program
+does not link against libpipewire and does not need the headers to build.
 
-## ◈ Install
+## Install
 
 ```bash
 git clone https://github.com/LotsV8pro/pc-audio-volume-controller.git
@@ -38,55 +37,44 @@ cd pc-audio-volume-controller
 ./install.sh
 ```
 
-Or manually:
+The script builds the release binary and installs `lotus-audio`, the desktop
+entry and the icon under `/usr/local`, so it asks for the sudo password.
+
+To build without installing:
 
 ```bash
 cargo build --release
-sudo install target/release/lotus-audio /usr/local/bin/
-sudo install lotus-audio.desktop /usr/local/share/applications/
+./target/release/lotus-audio
 ```
 
-### Dependencies
+## Requirements
 
-- A running **PipeWire** session (pipewire, pipewire-pulse)
-- **WirePlumber** (`wpctl`) — used at runtime to read/mutate the audio graph
-- **Rust** 1.70+ (`rustc`, `cargo`)
+- A running PipeWire session with WirePlumber (`wpctl` is required, the script
+  stops if it is missing)
+- `pw-cli` and `pw-link`, from the `pipewire` package
+- Rust 1.70 or newer, to build
 
-PipeWire libraries are accessed at runtime via `pw-cli`, `pw-link` and `wpctl` — **no build-time dependency** on PipeWire.
+## Use
 
-## ◈ Usage
+Run `lotus-audio`. Drag a pill to move an application, drag a fader to change a
+zone volume, and use the gear button to choose which zones are visible. The
+refresh button re-reads the graph; the auto-refresh toggle does it every two
+seconds.
 
-```bash
-lotus-audio
-```
+Configuration is stored in `~/.config/lotus-audio/config.json`: the list of
+enabled sinks and the saved volumes.
 
-- **Route an app** — drag a pill (app name) from any zone column and drop it onto another zone
-- **Adjust volume** — drag the vertical slider in any zone column
-- **Toggle zones** — click the ⚙ button in the top bar, check/uncheck zones
-- **Refresh** — click ↻ or enable Auto-refresh toggle
+## Platform
 
-## ◈ Build from source
+PipeWire is the audio server on Linux, so the program is Linux only. A Windows or
+macOS port would need a different backend (WASAPI, CoreAudio) and the routing
+code would have to be rewritten around it. There is no plan for that.
 
-```bash
-git clone https://github.com/LotsV8pro/pc-audio-volume-controller.git
-cd pc-audio-volume-controller
-cargo build --release
-```
+## Related repos
 
-Requires Rust 1.70+ and a running PipeWire session. PipeWire libraries are accessed at runtime via `pw-cli` and `pw-link` — no build-time dependency.
+- [Lotus-Arch](https://github.com/LotsV8pro/Lotus-Arch): the desktop it was written for
+- [lotus-mic-chain](https://github.com/LotsV8pro/lotus-mic-chain): the microphone chain that feeds this graph
 
-## ◈ Windows / macOS
+## License
 
-PipeWire is a Linux audio server. This app **will not work** on Windows or macOS without a complete audio backend replacement (WASAPI / CoreAudio). A cross-platform backend is not currently planned.
-
----
-
-<p align="center">
-  <a href="https://github.com/LotsV8pro/Lotus-Arch"><img src="https://img.shields.io/badge/Lotus_Arch-141218?style=flat-square&logo=arch-linux&logoColor=C4A8E2"/></a>
-  <a href="https://github.com/LotsV8pro/lotus-spotify"><img src="https://img.shields.io/badge/Lotus_Spotify-141218?style=flat-square&logo=spotify&logoColor=C4A8E2"/></a>
-  <a href="https://github.com/LotsV8pro/lotus-discord"><img src="https://img.shields.io/badge/Lotus_Discord-141218?style=flat-square&logo=discord&logoColor=C4A8E2"/></a>
-</p>
-
-<p align="center">
-  <sub>MIT License — <a href="https://github.com/LotsV8pro">@LotsV8pro</a></sub>
-</p>
+MIT.
